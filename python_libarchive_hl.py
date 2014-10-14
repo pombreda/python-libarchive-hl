@@ -5,9 +5,13 @@
 #
 
 
-from libarchive import Archive
+from libarchive import Archive, Entry
 import os
 from collections import defaultdict
+
+
+def _mkdd():
+	return defaultdict(_mkdd)
 
 
 class AttributeManager(object):
@@ -15,46 +19,46 @@ class AttributeManager(object):
 		pass
 
 	def __iter__(self):
-		pass
+		raise NotImplementedError()
 
 	def __contains__(self, item):
-		pass
+		raise NotImplementedError()
 
 	def __getitem__(self, item):
-		pass
+		raise NotImplementedError()
 
 	def __setitem__(self, key, value):
-		pass
+		raise NotImplementedError()
 
 	def __delitem__(self, key):
-		pass
+		raise NotImplementedError()
 
 	def keys(self):
-		pass
+		raise NotImplementedError()
 
 	def values(self):
-		pass
+		raise NotImplementedError()
 
 	def items(self):
-		pass
+		raise NotImplementedError()
 
 	def iterkeys(self):
-		pass
+		raise NotImplementedError()
 
 	def itervalues(self):
-		pass
+		raise NotImplementedError()
 
 	def iteritems(self):
-		pass
+		raise NotImplementedError()
 
 	def get(self, name, default=None):
-		pass
+		raise NotImplementedError()
 
 	def create(self, name, data, shape=None, dtype=None):
-		pass
+		raise NotImplementedError()
 
 	def modify(self, name, value):
-		pass
+		raise NotImplementedError()
 
 
 class SoftLink(object):
@@ -69,97 +73,107 @@ class ExternalLink(object):
 
 
 class Group(object):
-	def __init__(self, file, name, parent):
+	def __init__(self, file_, name, parent):
 		self.attrs = AttributeManager(self)
-		self.file = file
+		self.file_ = file_
 		self.name = name
 		self.parent = parent
+		self.pathname = parent.pathname + '/' + name
+		self._toc = parent._toc[name]
 
 	def __iter__(self):
-		pass
+		raise NotImplementedError()
 
 	def __contains__(self, item):
-		pass
+		raise NotImplementedError()
 
 	def __getitem__(self, item):
-		pass
+		raise NotImplementedError()
 
 	def __setitem__(self, key, value):
-		pass
+		raise NotImplementedError()
 
 	def keys(self):
-		pass
+		raise NotImplementedError()
 
 	def values(self):
-		pass
+		raise NotImplementedError()
 
 	def items(self):
-		pass
+		raise NotImplementedError()
 
 	def iterkeys(self):
-		pass
+		raise NotImplementedError()
 
 	def itervalues(self):
-		pass
+		raise NotImplementedError()
 
 	def iteritems(self):
-		pass
+		raise NotImplementedError()
 
 	def get(self, name, default=None, getclass=False, getlink=False):
-		pass
+		raise NotImplementedError()
 
 	def visit(self, callable):
-		pass
+		raise NotImplementedError()
 
 	def visititems(self, callable):
-		pass
+		raise NotImplementedError()
 
 	def move(self, source, dest):
-		pass
+		raise NotImplementedError()
 
 	def copy(self, source, dest, name=None, shallow=False, expand_soft=False, expand_external=False, expand_refs=False, without_attrs=False):
-		pass
+		raise NotImplementedError()
 
 	def create_group(self, name):
-		pass
+		if name in self._toc:
+			raise ValueError('Entry already exists: %s' % name)
+
+		self._toc[name] = _mkdd()
+
+		return Group(self.file_, name, self)
 
 	def require_group(self, name):
-		pass
+		if name in self._toc and self._toc[name] is Group:
+			return Group(self.file_, name, self)
+		else:
+			return self.create_group(name)
 
-	def create_dataset(self, shape=None, dtype=None, data=None, **kwargs):
-		pass
+	def create_dataset(self, name, shape=None, dtype=None, data=None, **kwargs):
+		if name in self._toc:
+			raise ValueError('Entry already exists: %s' % name)
 
-	def require_dataset(self, shape=None, dtype=None, data=None, **kwargs):
-		pass
+		self._toc[name] = Dataset(self.file_, name, self, shape=shape, dtype=dtype, data=data)
+
+	def require_dataset(self, name, shape=None, dtype=None, data=None, **kwargs):
+		if name in self._toc and self._toc[name] is Dataset:
+			return self._toc[name]
+		else:
+			return self.create_dataset(name, shape=shape, dtype=dtype, data=data, **kwargs)
 
 
 class File(Group):
-	def __init__(self, name, mode):
-		super(File, self).__init__(self, '/', None) # The / group
+	def __init__(self, filename, mode):
+		self.pathname = ''
 
-		def mkdd():
-			return defaultdict(mkdd)
+		f = Archive(filename, 'r')
 
-		self._toc = defaultdict(mkdd)
+		self._toc = _mkdd()
 
 		print 'Reading TOC...'
-		f = Archive(name, 'r')
-		p = self._toc['/']
+		p = self._toc
 		for ent in f:
-			print ent.pathname
 			frags = filter(lambda x: x != '', ent.pathname.split('/'))
 			for frag in frags[:-1]:
 				p = p[frag]
 
-			ent.pathname = ''
-			p[frags[-1]] = ent
-
-		print p
+			p[frags[-1]] = Entry()
 
 		f.close()
 
-		self._archive = Archive(name, mode)
-		self.filename = name
+		super(File, self).__init__(self, '/', self) # The / group
+		self.filename = filename
 		self.mode = mode
 
 	def close(self):
@@ -173,7 +187,7 @@ class File(Group):
 
 
 class Dataset(object):
-	def __init__(self, file, parent, name):
+	def __init__(self, file_, name, parent):
 		self.shape = None
 		self.dtype = None
 		self.size = None
@@ -188,23 +202,23 @@ class Dataset(object):
 		self.dims = None
 		self.attrs = AttributeManager(self)
 		self.name = ''
-		self.file = file
+		self.file_ = file_
 		self.parent = parent
 
 	def __getitem__(self, item):
-		pass
+		raise NotImplementedError()
 
 	def __setitem__(self, key, value):
-		pass
+		raise NotImplementedError()
 
 	def read_direct(self, array, source_sel=None, dest_sel=None):
-		pass
+		raise NotImplementedError()
 
 	def astype(self, dtype):
-		pass
+		raise NotImplementedError()
 
 	def resize(self, size, axis=None):
-		pass
+		raise NotImplementedError()
 
 	def len(self):
-		pass
+		raise NotImplementedError()
